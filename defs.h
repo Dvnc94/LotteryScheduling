@@ -121,6 +121,7 @@ int             wait(void);
 void            wakeup(void*);
 void            yield(void);
 void            set_proc_tickets(int);
+void            check_ticks_ratio(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

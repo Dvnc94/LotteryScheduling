@@ -101,6 +101,7 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
   curproc->tickets = 100;  // init the number of tickets to 100
   curproc->pass = 0;
+  curproc->ticks = 0;
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;

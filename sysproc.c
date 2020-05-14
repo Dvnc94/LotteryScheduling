@@ -97,3 +97,10 @@ sys_set_tickets(int t)
   set_proc_tickets(t);
   return 0;
 }
+
+int
+sys_check_ticks(void)
+{
+  check_ticks_ratio();
+  return 0;
+}

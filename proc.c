@@ -6,10 +6,12 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "rand.h"
 
 void sort_3(int a[], int b[], int c[], int size);
 struct proc* pidToProcStruct(int pid);
-
+void hlt();
+void printArray(int a[], int size);
 
 struct {
   struct spinlock lock;
@@ -335,6 +337,10 @@ scheduler(void)
   static int ticks = 0;
   c->proc = 0;
 
+#ifdef LOTTERY
+  int flag = 1;
+#endif
+
 #ifdef STRIDE
 
 #define MAX_NUM_PROCS  20
@@ -350,29 +356,49 @@ scheduler(void)
 
     
 #ifdef LOTTERY
+
+    acquire(&ptable.lock);
+
+    int ticket=0;
+    int totalTickets = 0;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      totalTickets = totalTickets + p->tickets;  
+    }
+
+    long win = random_at_most(totalTickets);
+    if (!flag) hlt();
+    flag = 0;
+
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-     
+      ticket += p->tickets;
+      if(ticket < win){
+        continue;
+      }
+      flag = 1;
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
+      cprintf("process running%d %d\n",p, flag);
+      swtch(&c->scheduler, p->context);
       switchkvm();
 
       c->proc = 0;
       ticks++;
+      break;
     }
     release(&ptable.lock);
 
-   
 #endif
 
 #ifdef STRIDE
 
-    int arbitrary_constant = 1000;
+    int arbitrary_constant = 10000;
     int proc_count = 0;
     
     // Loop over process table looking to collect ticket values, passes, pids
@@ -386,43 +412,52 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      cprintf("p->pid: %d\n", p->pid);    
-      cprintf("p->tickets: %d\n", p->tickets);
+      //cprintf("p->pid: %d\n", p->pid);    
+      //cprintf("p->tickets: %d\n", p->tickets);
       pid_list[proc_count] = p->pid;
       stride_list[proc_count] = arbitrary_constant/p->tickets;
       pass_list[proc_count] = p->pass;
+      //cprintf("p->pass %d\n", p->pass);
       proc_count++;
      
     }
-    cprintf("proc count: %d\n",proc_count);
+    //cprintf("proc count: %d\n",proc_count);
     // sort the list of procs by pass values (stride and pids also sorted
     // by the same indices used to sort pass values
+    //cprintf("Pass list: \n");
+    //printArray(pass_list,20);
     sort_3(pass_list,pid_list,stride_list,proc_count);
+    //printArray(pass_list,20);
+
 
     // here we will pick the lowest pass value to execute
     // if there are ties in pass values, then lowest stride is used
     // if there are ties in stride values too, then arbitrarily pick
-    if(pass_list[0] == pass_list[1])
+    if(proc_count > 1 && (pass_list[0] == pass_list[1]))
     {
       // there is a tie! sort by stride instead
       sort_3(stride_list, pass_list, pid_list, proc_count);
 
       // execute the lowest index process here (if there are more 
       // ties, then oh well we pick this process first
-      p = pidToProcStruct(stride_list[0]);
+      p = pidToProcStruct(pid_list[0]);
       p->pass += stride_list[0];
     }
     else
     {
       // choose the proc with lowest pass value to execute (no tie's here)
       // and then update the pass value for that process
-      p = pidToProcStruct(pass_list[0]);
+      p = pidToProcStruct(pid_list[0]);
       p->pass += stride_list[0]; 
     }
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
-    cprintf("%d\n", p->pid);
+    //cprintf("%d", p->pid);
+    //printArray(pass_list,20);
+    //printArray(pid_list,20);
+    //printArray(stride_list,20);
+    p->ticks++;
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
@@ -628,9 +663,20 @@ set_proc_tickets(int nTickets)
   acquire(&ptable.lock);
   p->tickets = nTickets;
   release(&ptable.lock);
-  cprintf("Tickets set for pid: %d!\n", p->pid);
+  //cprintf("Tickets set for pid: %d!\n", p->pid);
   
 }
+
+
+void
+check_ticks_ratio(void)
+{
+  struct proc* p;
+  p = myproc();
+  cprintf("ticks\tratio\n");
+  cprintf("%d\t%d\n", p->ticks, p->ticks*100/ticks);
+}
+
 
 
 void
@@ -639,7 +685,7 @@ sort_3(int a[], int b[], int c[], int size)
   int i,j, temp;
   for(i=0; i < size-1; i++)
   {
-    for(j=0; j < size-2; j++)
+    for(j=0; j < size-1; j++)
     {
       if(a[j+1] < a[j])
       {
@@ -667,9 +713,21 @@ struct proc* pidToProcStruct(int pid)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
     if(p->pid == pid)
+    {
+//      cprintf("pid %d found\n", pid);
       return p;
+    }
   }
+
   cprintf("pid %d not found pidToProcStruct()\n",pid);
+
   return 0;
 }  
- 
+
+void printArray(int a[], int size)
+{
+  int i;
+  for(i=0; i < size; i++)
+    cprintf("[%d] = %d\n", i, a[i]);
+}
+

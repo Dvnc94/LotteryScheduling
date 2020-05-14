@@ -51,6 +51,7 @@ struct proc {
 
   int tickets;              // CS 202 <---------------**************
   int pass;                 // CS 202 <---------------**************
+  int ticks;
 
   char name[16];               // Process name (debugging)
 };
