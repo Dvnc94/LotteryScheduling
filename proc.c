@@ -6,10 +6,11 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "rand.h"
 
 void sort_3(int a[], int b[], int c[], int size);
 struct proc* pidToProcStruct(int pid);
-
+void hlt();
 
 struct {
   struct spinlock lock;
@@ -328,8 +329,12 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  static int ticks = 0;
+  // static int ticks = 0;
   c->proc = 0;
+
+#ifdef LOTTERY
+  int flag = 1;
+#endif
 
 #ifdef STRIDE
 
@@ -345,7 +350,40 @@ scheduler(void)
     sti();
 
 #ifdef LOTTERY
-    cprintf("L\n");
+    int ticket=0;
+    int totalTickets = 0;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      totalTickets = totalTickets + p->tickets;  
+    }
+
+    long win = random_at_most(totalTickets);
+    if (!flag) hlt();
+    flag = 0;
+
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      ticket += p->tickets;
+      if(ticket < win){
+        continue;
+      }
+      flag = 1;
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      cprintf("process running%d %d\n",p, flag);
+      swtch(&c->scheduler, p->context);
+      switchkvm();
+
+      c->proc = 0;
+      break;
+    }
+    release(&ptable.lock);
+
 #endif
 
 #ifdef STRIDE
@@ -631,13 +669,13 @@ sort_3(int a[], int b[], int c[], int size)
 
 struct proc* pidToProcStruct(int pid)
 {
-  struct proc p*;
+  struct proc *p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
     if(p->pid == pid)
       return p;
   }
-  cprintf("pid not found pidToProcStruct\n");
+  cprintf("pid not found %d\n", p);
   return 0;
 }  
  
