@@ -7,6 +7,10 @@
 #include "proc.h"
 #include "spinlock.h"
 
+void sort_3(int a[], int b[], int c[], int size);
+struct proc* pidToProcStruct(int pid);
+
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -324,18 +328,64 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  static int ticks = 0;
   c->proc = 0;
+
+#ifdef STRIDE
+
+#define MAX_NUM_PROCS  20
+
+  int pid_list[MAX_NUM_PROCS] = {0};  // pid for each process
+  int stride_list[MAX_NUM_PROCS] = {0}; // ticket counts for each process
+  int pass_list[MAX_NUM_PROCS] = {0};    // pass values for each process
+#endif
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
+#ifdef LOTTERY
+    cprintf("L\n");
+#endif
+
+#ifdef STRIDE
+
+    int arbitrary_constant = 1000;
+    int proc_count = 0;
+    // Loop over process table looking to collect ticket values, passes, pids
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
+     
+      pid_list[proc_count] = p->pid;
+      stride_list[proc_count] = arbitrary_constant/p->tickets;
+      pass_list[proc_count] = p->tickets
+      proc_count++;
+     
+    }
+
+    // sort the list of procs by pass values (stride and pids also sorted
+    // by the same indices used to sort pass values
+    sort_3(pass_list,pid_list,stride_list,proc_count);
+
+    // here we will pick the lowest pass value to execute
+    // if there are ties in pass values, then lowest stride is used
+    // if there are ties in stride values too, then arbitrarily pick
+    if(pass_list[0] == pass_list[1])
+    {
+      // there is a tie! sort by stride instead
+      sort_3(stride_list, pass_list, pid_list, proc_count);
+
+      // execute the lowest index process here (if there are more 
+      // ties, then oh well we pick this process first
+      p = pidToProcStruct(stride_list[0]);
+      p->pass += stride_list[0];
+    }
+    else
+    {
+      
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -351,6 +401,10 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
+
+#endif
+
+
 
   }
 }
@@ -532,3 +586,58 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+// CS202 system call to set the number of tickets
+void
+set_proc_tickets(int nTickets)
+{
+  argint(0,&nTickets);
+  struct proc *p = myproc();
+  acquire(&ptable.lock);
+  p->tickets = nTickets;
+  release(&ptable.lock);
+  cprintf("Tickets set for pid: %d!\n", p->pid);
+  
+}
+
+
+void
+sort_3(int a[], int b[], int c[], int size)
+{
+  int i,j, temp;
+  for(i=0; i < size-1; i++)
+  {
+    for(j=1; j < size-1; j++)
+    {
+      if(a[j+1] < a[j])
+      {
+        temp = a[j+1];
+	a[j+1] = a[j];
+	a[j] = temp;
+
+	temp = b[j+1];
+	b[j+1] = b[j];
+	b[j] = temp;
+
+	temp = c[j+1];
+	c[j+1] = c[j];
+	c[j] = temp;
+      }
+    }
+  }
+
+}
+
+
+struct proc* pidToProcStruct(int pid)
+{
+  struct proc p*;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->pid == pid)
+      return p;
+  }
+  cprintf("pid not found pidToProcStruct\n");
+  return 0;
+}  
+ 

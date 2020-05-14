@@ -89,3 +89,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// call the set_tickets() function
+int
+sys_set_tickets(int t)
+{
+  set_proc_tickets(t);
+  return 0;
+}
