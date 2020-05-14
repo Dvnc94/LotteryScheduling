@@ -142,6 +142,8 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->tickets = 100;
+  p->pass = 0;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -203,6 +205,8 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  np->tickets = 100;
+  np->pass = 0;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -344,11 +348,9 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
-    acquire(&ptable.lock);
- 
-
-
+    
 #ifdef LOTTERY
+    acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -363,6 +365,7 @@ scheduler(void)
       c->proc = 0;
       ticks++;
     }
+    release(&ptable.lock);
 
    
 #endif
@@ -373,17 +376,25 @@ scheduler(void)
     int proc_count = 0;
     
     // Loop over process table looking to collect ticket values, passes, pids
+    acquire(&ptable.lock);
+    
+//    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+//      if(p->state != RUNNABLE)
+//        continue;
+    
+    
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-     
+      cprintf("p->pid: %d\n", p->pid);    
+      cprintf("p->tickets: %d\n", p->tickets);
       pid_list[proc_count] = p->pid;
       stride_list[proc_count] = arbitrary_constant/p->tickets;
-      pass_list[proc_count] = p->tickets;
+      pass_list[proc_count] = p->pass;
       proc_count++;
      
     }
-
+    cprintf("proc count: %d\n",proc_count);
     // sort the list of procs by pass values (stride and pids also sorted
     // by the same indices used to sort pass values
     sort_3(pass_list,pid_list,stride_list,proc_count);
@@ -411,6 +422,7 @@ scheduler(void)
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
+    cprintf("%d\n", p->pid);
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
@@ -421,11 +433,10 @@ scheduler(void)
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
-
+    release(&ptable.lock);
 #endif
 
     ticks++;
-    release(&ptable.lock);
 
   } // end of infinite loop
 } // end of function
@@ -628,7 +639,7 @@ sort_3(int a[], int b[], int c[], int size)
   int i,j, temp;
   for(i=0; i < size-1; i++)
   {
-    for(j=1; j < size-1; j++)
+    for(j=0; j < size-2; j++)
     {
       if(a[j+1] < a[j])
       {
@@ -658,7 +669,7 @@ struct proc* pidToProcStruct(int pid)
     if(p->pid == pid)
       return p;
   }
-  cprintf("pid not found pidToProcStruct\n");
+  cprintf("pid %d not found pidToProcStruct()\n",pid);
   return 0;
 }  
  
