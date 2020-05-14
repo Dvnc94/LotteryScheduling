@@ -10,7 +10,6 @@
 
 void sort_3(int a[], int b[], int c[], int size);
 struct proc* pidToProcStruct(int pid);
-void hlt();
 void printArray(int a[], int size);
 
 struct {
@@ -338,7 +337,7 @@ scheduler(void)
   c->proc = 0;
 
 #ifdef LOTTERY
-  int flag = 1;
+  int win;
 #endif
 
 #ifdef STRIDE
@@ -365,14 +364,9 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      totalTickets = totalTickets + p->tickets;  
+      totalTickets = totalTickets + p->tickets; 
     }
-
-    long win = random_at_most(totalTickets);
-    if (!flag) hlt();
-    flag = 0;
-
-    acquire(&ptable.lock);
+    win = random_at_most(totalTickets);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -380,11 +374,10 @@ scheduler(void)
       if(ticket < win){
         continue;
       }
-      flag = 1;
+      p->ticks++;
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      cprintf("process running%d %d\n",p, flag);
       swtch(&c->scheduler, p->context);
       switchkvm();
 
