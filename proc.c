@@ -349,6 +349,10 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
+    acquire(&ptable.lock);
+ 
+
+
 #ifdef LOTTERY
     int ticket=0;
     int totalTickets = 0;
@@ -380,6 +384,7 @@ scheduler(void)
       switchkvm();
 
       c->proc = 0;
+      ticks++;
       break;
     }
     release(&ptable.lock);
@@ -390,16 +395,15 @@ scheduler(void)
 
     int arbitrary_constant = 1000;
     int proc_count = 0;
+    
     // Loop over process table looking to collect ticket values, passes, pids
-    acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
      
       pid_list[proc_count] = p->pid;
       stride_list[proc_count] = arbitrary_constant/p->tickets;
-      pass_list[proc_count] = p->tickets
+      pass_list[proc_count] = p->tickets;
       proc_count++;
      
     }
@@ -423,29 +427,32 @@ scheduler(void)
     }
     else
     {
-      
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+      // choose the proc with lowest pass value to execute (no tie's here)
+      // and then update the pass value for that process
+      p = pidToProcStruct(pass_list[0]);
+      p->pass += stride_list[0]; 
     }
-    release(&ptable.lock);
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
 
 #endif
 
+    ticks++;
+    release(&ptable.lock);
 
-
-  }
-}
+  } // end of infinite loop
+} // end of function
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
@@ -669,7 +676,7 @@ sort_3(int a[], int b[], int c[], int size)
 
 struct proc* pidToProcStruct(int pid)
 {
-  struct proc *p;
+  struct proc* p;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
     if(p->pid == pid)
