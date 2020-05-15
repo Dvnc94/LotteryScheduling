@@ -14,6 +14,9 @@ int main(int argc, char * argv[])
     {
       asm("nop");
     }
+    //if(i%1000==0 && i != 0)
+    //  check_ticks();
+
   }
   check_ticks();
   exit();
