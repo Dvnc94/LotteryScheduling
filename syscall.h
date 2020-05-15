@@ -22,3 +22,4 @@
 #define SYS_close  21
 #define SYS_set_tickets 22
 #define SYS_check_ticks 23
+#define SYS_reset_ticks 24
