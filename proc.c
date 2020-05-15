@@ -335,6 +335,7 @@ scheduler(void)
   struct cpu *c = mycpu();
   static int ticks = 0;
   c->proc = 0;
+  static int flag = 0;
 
 #ifdef LOTTERY
   int win;
@@ -352,7 +353,7 @@ scheduler(void)
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
+    
     
 #ifdef LOTTERY
 
@@ -373,6 +374,11 @@ scheduler(void)
       ticket += p->tickets;
       if(ticket < win){
         continue;
+      }
+      if(p->pid == 3 && flag == 0)
+      {
+        flag = 1;
+        ticks = 0;
       }
       p->ticks++;
       c->proc = p;
@@ -414,6 +420,7 @@ scheduler(void)
       proc_count++;
      
     }
+    
     //cprintf("proc count: %d\n",proc_count);
     // sort the list of procs by pass values (stride and pids also sorted
     // by the same indices used to sort pass values
@@ -450,6 +457,13 @@ scheduler(void)
     //printArray(pass_list,20);
     //printArray(pid_list,20);
     //printArray(stride_list,20);
+    if(p->pid == 3 && flag == 0)
+    {
+      flag = 1;
+      ticks = 0;
+    }
+    //if(ticks % 200 == 0 )
+    //  cprintf("%d", p->pid);
     p->ticks++;
     c->proc = p;
     switchuvm(p);
@@ -664,10 +678,26 @@ set_proc_tickets(int nTickets)
 void
 check_ticks_ratio(void)
 {
+  static int flag = 0;
+  int i;
   struct proc* p;
-  p = myproc();
-  cprintf("ticks\tratio\n");
-  cprintf("%d\t%d\n", p->ticks, p->ticks*100/ticks);
+  //p = myproc();
+  //cprintf("Finished first pid:  %d\n", p->pid);
+  if(flag == 0)
+  {
+    flag = 1;
+    cprintf("ticks\tratio\n");
+    //acquire(&ptable.lock);
+    for(i=3; i <= 7; i=i+2)
+    {
+      acquire(&ptable.lock);
+      p = pidToProcStruct(i);
+      release(&ptable.lock);
+      if(p != 0)
+        cprintf("%d\t%d\n", p->ticks, p->ticks*100/ticks);
+    }
+    //release(&ptable.lock);
+  }
 }
 
 
