@@ -421,24 +421,24 @@ scheduler(void)
     // here we will pick the lowest pass value to execute
     // if there are ties in pass values, then lowest stride is used
     // if there are ties in stride values too, then arbitrarily pick
-    if(proc_count > 1 && (pass_list[0] == pass_list[1]))
-    {
+    //if(proc_count > 1 && (pass_list[0] == pass_list[1]))
+    //{
       // there is a tie! sort by stride instead
-      sort_3(stride_list, pass_list, pid_list, proc_count);
+    //  sort_3(stride_list, pass_list, pid_list, proc_count);
       //if(ticks == 100)
 //	 cprintf("H");
       // execute the lowest index process here (if there are more 
       // ties, then oh well we pick this process first
-      p = pidToProcStruct(pid_list[0]);
-      p->pass += stride_list[0];
-    }
-    else
-    {
+    //  p = pidToProcStruct(pid_list[0]);
+    //  p->pass += stride_list[0];
+    //}
+    //else
+    //{
       // choose the proc with lowest pass value to execute (no tie's here)
       // and then update the pass value for that process
       p = pidToProcStruct(pid_list[0]);
       p->pass += stride_list[0]; 
-    }
+    //}
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
@@ -667,7 +667,7 @@ check_ticks_ratio(void)
   //cprintf("Finished first pid:  %d\n", p->pid);
   if(flag == 0)
   {
-    flag = 0;
+    flag = 1;
     cprintf("ticks\tratio\n");
     acquire(&ptable.lock);
     for(i=3; i <= 7; i=i+2)
