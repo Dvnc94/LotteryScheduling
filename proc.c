@@ -145,6 +145,7 @@ userinit(void)
   p->tf->eip = 0;  // beginning of initcode.S
   p->tickets = 100;
   p->pass = 0;
+  p->ticks = 0;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -208,6 +209,7 @@ fork(void)
   *np->tf = *curproc->tf;
   np->tickets = 100;
   np->pass = 0;
+  np->ticks = 0;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -375,7 +377,7 @@ scheduler(void)
       if(ticket < win){
         continue;
       }
-      if(p->pid == 3 && flag == 0)
+      if((p->pid == 3 || p->pid == 5 || p->pid == 7) && flag == 0)
       {
         flag = 1;
         ticks = 0;
@@ -403,33 +405,19 @@ scheduler(void)
     // Loop over process table looking to collect ticket values, passes, pids
     acquire(&ptable.lock);
     
-//    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-//      if(p->state != RUNNABLE)
-//        continue;
-    
-    
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      //cprintf("p->pid: %d\n", p->pid);    
-      //cprintf("p->tickets: %d\n", p->tickets);
       pid_list[proc_count] = p->pid;
       stride_list[proc_count] = arbitrary_constant/p->tickets;
       pass_list[proc_count] = p->pass;
-      //cprintf("p->pass %d\n", p->pass);
       proc_count++;
-     
     }
     
-    //cprintf("proc count: %d\n",proc_count);
     // sort the list of procs by pass values (stride and pids also sorted
     // by the same indices used to sort pass values
-    //cprintf("Pass list: \n");
-    //printArray(pass_list,20);
     sort_3(pass_list,pid_list,stride_list,proc_count);
-    //printArray(pass_list,20);
-
-
+    
     // here we will pick the lowest pass value to execute
     // if there are ties in pass values, then lowest stride is used
     // if there are ties in stride values too, then arbitrarily pick
@@ -437,7 +425,8 @@ scheduler(void)
     {
       // there is a tie! sort by stride instead
       sort_3(stride_list, pass_list, pid_list, proc_count);
-
+      //if(ticks == 100)
+//	 cprintf("H");
       // execute the lowest index process here (if there are more 
       // ties, then oh well we pick this process first
       p = pidToProcStruct(pid_list[0]);
@@ -453,17 +442,11 @@ scheduler(void)
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
-    //cprintf("%d", p->pid);
-    //printArray(pass_list,20);
-    //printArray(pid_list,20);
-    //printArray(stride_list,20);
     if(p->pid == 3 && flag == 0)
     {
       flag = 1;
       ticks = 0;
     }
-    //if(ticks % 200 == 0 )
-    //  cprintf("%d", p->pid);
     p->ticks++;
     c->proc = p;
     switchuvm(p);
@@ -471,14 +454,13 @@ scheduler(void)
 
     swtch(&(c->scheduler), p->context);
     switchkvm();
-
+    
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
     release(&ptable.lock);
-#endif
-
     ticks++;
+#endif
 
   } // end of infinite loop
 } // end of function
@@ -670,7 +652,7 @@ set_proc_tickets(int nTickets)
   acquire(&ptable.lock);
   p->tickets = nTickets;
   release(&ptable.lock);
-  //cprintf("Tickets set for pid: %d!\n", p->pid);
+//  cprintf("Tickets set for pid: %d!\n", p->pid);
   
 }
 
@@ -685,18 +667,22 @@ check_ticks_ratio(void)
   //cprintf("Finished first pid:  %d\n", p->pid);
   if(flag == 0)
   {
-    flag = 1;
+    flag = 0;
     cprintf("ticks\tratio\n");
-    //acquire(&ptable.lock);
+    acquire(&ptable.lock);
     for(i=3; i <= 7; i=i+2)
     {
-      acquire(&ptable.lock);
+      //acquire(&ptable.lock);
       p = pidToProcStruct(i);
-      release(&ptable.lock);
+      //release(&ptable.lock);
       if(p != 0)
+      {   
         cprintf("%d\t%d\n", p->ticks, p->ticks*100/ticks);
+  //      cprintf("pass: %d\n", p->pass);
+      
+      }
     }
-    //release(&ptable.lock);
+    release(&ptable.lock);
   }
 }
 
