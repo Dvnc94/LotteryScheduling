@@ -718,13 +718,10 @@ struct proc* pidToProcStruct(int pid)
   {
     if(p->pid == pid)
     {
-//      cprintf("pid %d found\n", pid);
       return p;
     }
   }
-
   cprintf("pid %d not found pidToProcStruct()\n",pid);
-
   return 0;
 }  
 
