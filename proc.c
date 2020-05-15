@@ -344,9 +344,7 @@ scheduler(void)
 #endif
 
 #ifdef STRIDE
-
 #define MAX_NUM_PROCS  20
-
   int pid_list[MAX_NUM_PROCS] = {0};  // pid for each process
   int stride_list[MAX_NUM_PROCS] = {0}; // ticket counts for each process
   int pass_list[MAX_NUM_PROCS] = {0};    // pass values for each process
@@ -356,20 +354,20 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
     
-    
 #ifdef LOTTERY
 
     acquire(&ptable.lock);
-
     int ticket=0;
     int totalTickets = 0;
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      totalTickets = totalTickets + p->tickets; 
+      totalTickets = totalTickets + p->tickets;
     }
+
     win = random_at_most(totalTickets);
+
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -394,7 +392,6 @@ scheduler(void)
       break;
     }
     release(&ptable.lock);
-
 #endif
 
 #ifdef STRIDE
@@ -652,8 +649,6 @@ set_proc_tickets(int nTickets)
   acquire(&ptable.lock);
   p->tickets = nTickets;
   release(&ptable.lock);
-//  cprintf("Tickets set for pid: %d!\n", p->pid);
-  
 }
 
 
